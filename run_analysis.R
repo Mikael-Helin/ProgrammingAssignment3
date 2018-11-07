@@ -1,0 +1,50 @@
+library(dplyr)
+
+## Get raw data ##
+if(!file.exists("Raw Data")){
+  dir.create("Raw Data")
+  setwd("Raw Data")
+  download.file("https://d396qusza40orc.cloudfront.net/getdata%2Fprojectfiles%2FUCI%20HAR%20Dataset.zip","project.zip",mode="wb")
+  unzip("project.zip")
+  setwd("..")
+}
+setwd("Raw Data/UCI HAR Dataset")
+
+## Get relevant features (step2)
+features<-read.table("features.txt")
+features<-features[grep("mean|std",features[,2]),]
+
+## Appropriately label the data set with descriptive variable names (step4) ##
+features[,2]<-gsub("\\(\\)","",features[,2])
+features[,2]<-gsub("^f","frequencyDomain-",features[,2])
+features[,2]<-gsub("^t","timeDomain-",features[,2])
+features[,2]<-gsub("Jerk","-Jerk",features[,2])
+features[,2]<-gsub("Acc","-Accelerometer",features[,2])
+features[,2]<-gsub("Gyro","-Gyroscope",features[,2])
+features[,2]<-gsub("Mag","-Magnitude",features[,2])
+features[,2]<-gsub("Freq","-Frequency",features[,2])
+
+## Merge the training and the test sets to create one data set (step1)
+mydf<-data.frame()
+mydf<-cbind(rbind(read.table(paste("./test/subject_test.txt",sep="")),read.table(paste("./train/subject_train.txt",sep=""))))
+y<-rbind(read.table(paste("./test/y_test.txt",sep="")),read.table(paste("./train/y_train.txt",sep="")))
+                         
+## Activity labels (step3)
+activity_labels<-read.table("./activity_labels.txt")
+
+## step 1 continues, mydf becomes the first tidy set
+for(a in activity_labels[,1]) y[y==a]<-as.character(activity_labels[a,2])
+mydf<-cbind(mydf,y)
+res<-rbind(read.table(paste("./test/X_test.txt",sep="")),read.table(paste("./train/X_train.txt",sep="")))
+res<-res[,features[,1]]
+for(X in 1:length(res)) mydf<-cbind(mydf,res[,X])
+names(mydf)<-c("subject","activity",features[,2])
+
+## Clean up and save first data table
+setwd("../..")
+unlink("Raw Data",recursive=TRUE)
+write.table(mydf,"tidy_data.txt",row.name=FALSE)
+
+## Create and save a second, independent tidy set with the average of each variable for each activity and each subject
+mydf2<-mydf%>%group_by(subject,activity)%>%summarise_each(funs(mean))
+write.table(mydf2,"tidy_data_means.txt",row.name=FALSE)
